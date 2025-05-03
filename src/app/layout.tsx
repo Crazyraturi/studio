@@ -12,6 +12,10 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 export const metadata: Metadata = {
   title: 'InviteAI VBDA',
   description: 'AI-Powered Invitation Management for VBDA 2025',
+  // Note: Favicon generation is not supported. Add favicon link here manually if needed.
+  // icons: {
+  //   icon: '/favicon.ico', // Example path
+  // },
 };
 
 export default function RootLayout({
@@ -22,7 +26,6 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        suppressHydrationWarning // Keep this prop to suppress hydration warnings if unavoidable
         className={cn(
           'min-h-screen bg-secondary font-sans antialiased',
           inter.variable
