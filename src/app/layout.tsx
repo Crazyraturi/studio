@@ -21,6 +21,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
+        suppressHydrationWarning // Add this prop
         className={cn(
           'min-h-screen bg-secondary font-sans antialiased',
           inter.variable
