@@ -1,6 +1,7 @@
+// src/app/recipients/page.tsx
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
@@ -8,11 +9,13 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Filter, Trash2, Edit, Eye, Mail, Sparkles } from 'lucide-react';
+import { MoreHorizontal, Filter, Trash2, Edit, Eye, Mail, Sparkles, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { personalizeInvitation } from '@/ai/flows/personalize-invitations';
+import { useAppData } from '@/context/AppDataContext'; // Import useAppData
 
-interface Recipient {
+// Define Recipient type here or import if defined centrally
+export interface Recipient {
   id: string;
   firstName: string;
   email: string;
@@ -23,20 +26,12 @@ interface Recipient {
   lastContacted?: Date | null;
 }
 
-// Placeholder data - replace with actual data fetching and state management (e.g., zustand, redux, context)
-const initialRecipients: Recipient[] = [
-  { id: '1', firstName: 'Aisha', email: 'aisha.sharma@innovatech.com', organization: 'Innovatech Solutions', achievement: 'Secured $50M Series B funding', role: 'CEO', status: 'Not Invited', lastContacted: null },
-  { id: '2', firstName: 'Rohan', email: 'rohan.mehta@finserve.co', organization: 'FinServe Dynamics', achievement: 'Launched new fintech platform', role: 'CTO', status: 'Invited', lastContacted: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) },
-  { id: '3', firstName: 'Priya', email: 'priya.patel@greenenergy.org', organization: 'GreenEnergy Foundation', achievement: 'Led $100M solar project initiative', role: 'Director', status: 'Follow-up 1', lastContacted: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000) },
-  { id: '4', firstName: 'Vikram', email: 'vikram.singh@healthplus.ai', organization: 'HealthPlus AI', achievement: 'Developed AI diagnostic tool', role: 'Lead Researcher', status: 'RSVPed', lastContacted: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000) },
-   { id: '5', firstName: 'Sunita', email: 'sunita.rao@edutechglobal.com', organization: 'EduTech Global', achievement: 'Expanded operations to 5 new countries', role: 'COO', status: 'Not Invited', lastContacted: null },
-];
-
 export default function RecipientsPage() {
-  const [recipients, setRecipients] = useState<Recipient[]>(initialRecipients);
+  const { recipients, deleteRecipients } = useAppData(); // Get data and actions from context
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [filterStatus, setFilterStatus] = useState<string>('All');
+  const [generatingEmailId, setGeneratingEmailId] = useState<string | null>(null); // Track loading state per row
   const { toast } = useToast();
 
   const filteredRecipients = useMemo(() => {
@@ -54,40 +49,42 @@ export default function RecipientsPage() {
     });
   }, [recipients, searchTerm, filterStatus]);
 
-  const handleSelectAll = (checked: boolean | 'indeterminate') => {
+  const handleSelectAll = useCallback((checked: boolean | 'indeterminate') => {
     if (checked === true) {
       const allIds = new Set(filteredRecipients.map(r => r.id));
       setSelectedRows(allIds);
     } else {
       setSelectedRows(new Set());
     }
-  };
+  }, [filteredRecipients]);
 
-  const handleRowSelect = (id: string, checked: boolean) => {
-    const newSelectedRows = new Set(selectedRows);
-    if (checked) {
-      newSelectedRows.add(id);
-    } else {
-      newSelectedRows.delete(id);
-    }
-    setSelectedRows(newSelectedRows);
-  };
+  const handleRowSelect = useCallback((id: string, checked: boolean) => {
+    setSelectedRows(prev => {
+      const newSelectedRows = new Set(prev);
+      if (checked) {
+        newSelectedRows.add(id);
+      } else {
+        newSelectedRows.delete(id);
+      }
+      return newSelectedRows;
+    });
+  }, []);
 
-  const isAllSelected = selectedRows.size > 0 && selectedRows.size === filteredRecipients.length;
-  const isIndeterminate = selectedRows.size > 0 && selectedRows.size < filteredRecipients.length;
+  const isAllSelected = useMemo(() => selectedRows.size > 0 && selectedRows.size === filteredRecipients.length, [selectedRows, filteredRecipients.length]);
+  const isIndeterminate = useMemo(() => selectedRows.size > 0 && selectedRows.size < filteredRecipients.length, [selectedRows, filteredRecipients.length]);
 
-  const handleDeleteSelected = () => {
+  const handleDeleteSelected = useCallback(() => {
       if (selectedRows.size === 0) {
           toast({title: "No recipients selected", description: "Please select recipients to delete.", variant: "destructive"});
           return;
       }
-     // In a real app, you'd confirm deletion and call an API
-     setRecipients(prev => prev.filter(r => !selectedRows.has(r.id)));
+     deleteRecipients(selectedRows); // Call context action
      setSelectedRows(new Set());
      toast({ title: "Recipients Deleted", description: `${selectedRows.size} recipient(s) removed.` });
-  };
+  }, [selectedRows, deleteRecipients, toast]);
 
-   const handleGeneratePersonalizedEmail = async (recipient: Recipient) => {
+  const handleGeneratePersonalizedEmail = async (recipient: Recipient) => {
+       setGeneratingEmailId(recipient.id); // Set loading state for this row
        toast({ title: "Generating Email...", description: `Personalizing email for ${recipient.firstName}...` });
        try {
            const result = await personalizeInvitation({
@@ -98,16 +95,24 @@ export default function RecipientsPage() {
                role: recipient.role,
            });
 
-           // In a real app, you might open a modal with the email or directly send it.
-           console.log("Generated Email:", result);
+           // Display the generated email in an alert for preview
            alert(`Generated Email Preview for ${recipient.firstName}:\n\nSubject: ${result.subject}\n\nBody:\n${result.body}`);
-            toast({ title: "Email Generated", description: `Personalized email ready for ${recipient.firstName}.` });
+           toast({ title: "Email Generated", description: `Personalized email preview shown for ${recipient.firstName}.` });
 
        } catch (error) {
            console.error("Failed to generate personalized email:", error);
            toast({ title: "Generation Failed", description: "Could not generate personalized email.", variant: "destructive" });
+       } finally {
+           setGeneratingEmailId(null); // Clear loading state
        }
    };
+
+   const handleDeleteSingle = useCallback((recipient: Recipient) => {
+        const idsToDelete = new Set([recipient.id]);
+        deleteRecipients(idsToDelete);
+        setSelectedRows(prev => { const next = new Set(prev); next.delete(recipient.id); return next; });
+        toast({ title: "Recipient Deleted", description: `${recipient.firstName} removed.` });
+   }, [deleteRecipients, toast]);
 
   const statusOptions = ['All', 'Not Invited', 'Invited', 'Follow-up 1', 'Follow-up 2', 'RSVPed', 'Declined'];
 
@@ -158,7 +163,7 @@ export default function RecipientsPage() {
                 <TableRow>
                    <TableHead padding="checkbox">
                       <Checkbox
-                        checked={isAllSelected || isIndeterminate}
+                        checked={isIndeterminate ? 'indeterminate' : isAllSelected}
                         onCheckedChange={handleSelectAll}
                         aria-label="Select all rows"
                       />
@@ -189,14 +194,14 @@ export default function RecipientsPage() {
                       <TableCell className="hidden md:table-cell">{recipient.role}</TableCell>
                       <TableCell>{recipient.status}</TableCell>
                       <TableCell className="hidden lg:table-cell">
-                        {recipient.lastContacted ? recipient.lastContacted.toLocaleDateString() : 'N/A'}
+                        {recipient.lastContacted ? new Date(recipient.lastContacted).toLocaleDateString() : 'N/A'}
                       </TableCell>
                       <TableCell>
                          <DropdownMenu>
                            <DropdownMenuTrigger asChild>
-                             <Button variant="ghost" className="h-8 w-8 p-0">
+                             <Button variant="ghost" className="h-8 w-8 p-0" disabled={generatingEmailId === recipient.id}>
                                <span className="sr-only">Open menu</span>
-                               <MoreHorizontal className="h-4 w-4" />
+                               {generatingEmailId === recipient.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
                              </Button>
                            </DropdownMenuTrigger>
                            <DropdownMenuContent align="end">
@@ -207,18 +212,15 @@ export default function RecipientsPage() {
                              <DropdownMenuItem onClick={() => alert(`Editing ${recipient.firstName}`)}>
                                <Edit className="mr-2 h-4 w-4" /> Edit Recipient
                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleGeneratePersonalizedEmail(recipient)}>
-                                <Sparkles className="mr-2 h-4 w-4" /> Generate Email
+                              <DropdownMenuItem onClick={() => handleGeneratePersonalizedEmail(recipient)} disabled={generatingEmailId === recipient.id}>
+                                {generatingEmailId === recipient.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                                Generate Email
                               </DropdownMenuItem>
-                             <DropdownMenuItem onClick={() => alert(`Sending email to ${recipient.firstName}`)}>
+                             <DropdownMenuItem onClick={() => alert(`Sending test email to ${recipient.firstName}`)}>
                                <Mail className="mr-2 h-4 w-4" /> Send Test Email
                              </DropdownMenuItem>
                              <DropdownMenuSeparator />
-                             <DropdownMenuItem onClick={() => {
-                                 setRecipients(prev => prev.filter(r => r.id !== recipient.id));
-                                 setSelectedRows(prev => { const next = new Set(prev); next.delete(recipient.id); return next; });
-                                 toast({ title: "Recipient Deleted", description: `${recipient.firstName} removed.` });
-                             }} className="text-destructive focus:bg-destructive focus:text-destructive-foreground">
+                             <DropdownMenuItem onClick={() => handleDeleteSingle(recipient)} className="text-destructive focus:bg-destructive focus:text-destructive-foreground">
                                <Trash2 className="mr-2 h-4 w-4" /> Delete
                              </DropdownMenuItem>
                            </DropdownMenuContent>
@@ -229,7 +231,7 @@ export default function RecipientsPage() {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={8} className="h-24 text-center">
-                      No recipients found.
+                      No recipients found matching your criteria.
                     </TableCell>
                   </TableRow>
                 )}

@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar';
 import { Toaster } from '@/components/ui/toaster';
 import AppSidebar from '@/components/AppSidebar';
+import { AppDataProvider } from '@/context/AppDataContext'; // Import the provider
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 
@@ -21,21 +22,23 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        suppressHydrationWarning // Add this prop
+        suppressHydrationWarning // Keep this prop to suppress hydration warnings if unavoidable
         className={cn(
           'min-h-screen bg-secondary font-sans antialiased',
           inter.variable
         )}
       >
-        <SidebarProvider defaultOpen>
-            <Sidebar collapsible="icon" side="left" variant="sidebar">
-              <AppSidebar />
-            </Sidebar>
-            <SidebarInset>
-                {children}
-            </SidebarInset>
-        </SidebarProvider>
-        <Toaster />
+        <AppDataProvider> {/* Wrap with AppDataProvider */}
+          <SidebarProvider defaultOpen>
+              <Sidebar collapsible="icon" side="left" variant="sidebar">
+                <AppSidebar />
+              </Sidebar>
+              <SidebarInset>
+                  {children}
+              </SidebarInset>
+          </SidebarProvider>
+          <Toaster />
+        </AppDataProvider> {/* Close AppDataProvider */}
       </body>
     </html>
   );

@@ -1,14 +1,29 @@
+'use client'; // Add this line
+
+import React, { useMemo } from 'react'; // Import useMemo
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart3, Mail, Send, Users } from 'lucide-react';
+import { useAppData } from '@/context/AppDataContext'; // Import useAppData
 
 export default function DashboardPage() {
-  // Placeholder data - replace with actual data fetching
-  const stats = {
-    recipients: 1250,
-    emailsSent: 850,
-    openRate: '65%',
-    rsvpRate: '22%',
-  };
+  const { recipients } = useAppData(); // Get recipients from context
+
+  // Calculate stats based on context data
+  const stats = useMemo(() => {
+    const totalRecipients = recipients.length;
+    // Simulate other stats based on total recipients for now
+    // In a real app, these would come from tracking or other data sources
+    const emailsSent = Math.min(totalRecipients, 850); // Example simulation
+    const openRateNum = 65; // Example static percentage
+    const rsvpRateNum = recipients.filter(r => r.status === 'RSVPed').length / (emailsSent || 1) * 100; // Calculate RSVP rate
+
+    return {
+      recipients: totalRecipients,
+      emailsSent: emailsSent,
+      openRate: `${openRateNum.toFixed(0)}%`, // Keep as string for display
+      rsvpRate: `${rsvpRateNum.toFixed(1)}%`, // Keep as string for display
+    };
+  }, [recipients]);
 
   return (
     <div className="flex flex-col min-h-screen p-6 bg-secondary">
@@ -25,7 +40,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.recipients}</div>
-            <p className="text-xs text-muted-foreground">Potential participants uploaded</p>
+            <p className="text-xs text-muted-foreground">Participants in the system</p>
           </CardContent>
         </Card>
         <Card className="card-shadow rounded-corners">
@@ -35,7 +50,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.emailsSent}</div>
-            <p className="text-xs text-muted-foreground">Invitations dispatched</p>
+            <p className="text-xs text-muted-foreground">Invitations dispatched (simulated)</p>
           </CardContent>
         </Card>
         <Card className="card-shadow rounded-corners">
@@ -45,7 +60,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.openRate}</div>
-            <p className="text-xs text-muted-foreground">Based on tracked emails</p>
+            <p className="text-xs text-muted-foreground">Based on tracked emails (simulated)</p>
           </CardContent>
         </Card>
         <Card className="card-shadow rounded-corners">
@@ -55,7 +70,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-accent">{stats.rsvpRate}</div>
-            <p className="text-xs text-muted-foreground">Confirmed attendees</p>
+            <p className="text-xs text-muted-foreground">Based on confirmed attendees</p>
           </CardContent>
         </Card>
       </div>
